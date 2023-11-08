@@ -31,7 +31,8 @@ class RG1800Dataset(Dataset):
     def __len__(self):
         return len(self.img_paths)
 
-    def get_boundary(self, mask):
+    @staticmethod
+    def get_boundary(mask):
         """
         compute boundary using canny
         :param mask:

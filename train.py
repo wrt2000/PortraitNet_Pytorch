@@ -10,6 +10,7 @@ import torch.nn as nn
 from models.PortraitNet import PortraitNet
 from data.Portraitdataset import RG1800Dataset
 from utils.loss_func import TotalLoss
+from utils.utils import ConfusionMatrix
 
 
 def get_logger():
@@ -44,7 +45,9 @@ def parse_args():
     parser.add_argument('--weight_decay', type=float, default=5e-4)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--device', type=str, default='0,1')
+    # save
     parser.add_argument('--save_dir', type=str, default='results')
+    parser.add_argument('--save_freq', type=int, default=500)
 
     args = parser.parse_args()
     return args
@@ -81,6 +84,7 @@ def test(args, val_loader, model, criterion, epoch, device, logger):
     model.eval()
     with torch.no_grad():
         losses = []
+        confusion_matrix = ConfusionMatrix()
         for i, sample in enumerate(val_loader):
             img = sample['Img'].to(device)
             mask = sample['Mask'].to(device)
@@ -90,14 +94,13 @@ def test(args, val_loader, model, criterion, epoch, device, logger):
             mask_texture, boundary_texture = model(img_texture)
             loss = criterion(mask_def, mask, boundary_def, boundary, mask_texture, boundary_texture)
             losses.append(loss.item())
-
-            # compute iou
-            
+            confusion_matrix.update(mask_def, mask)
 
             if i % 10 == 0:
                 logger.info('Epoch: {}, Iter: {}, Loss: {}'.format(epoch, i, loss.item()))
-
-        return sum(losses) / len(losses)
+        # compute iou
+        iou = confusion_matrix.get_iou()
+        return sum(losses) / len(losses), iou
 
 
 def main():
@@ -111,13 +114,20 @@ def main():
         os.makedirs(args.save_dir)
 
     # Dataset
+    logger.info('Loading dataset...')
     train_dataset = RG1800Dataset(args, train=True)
     val_dataset = RG1800Dataset(args, train=False)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+    logger.info('Finish loading dataset! Total training examples: {}, Total validation examples: {}'.format(
+        train_dataset.__len__(), val_dataset.__len__()))
 
     # Model
+    logger.info('Building model...')
     model = PortraitNet().to(device)
+    logger.info(model)
+    logger.info('Finish building model!')
+
     # Loss
     criterion = TotalLoss(args).to(device)
 
@@ -133,12 +143,23 @@ def main():
     validation_losses = []
     for epoch in range(args.epochs):
         train_loss = train(args, train_loader, model, criterion, optimizer, scheduler, epoch, device, logger)
-        test_loss = test(args, val_loader, model, criterion, epoch, device, logger)
+        test_loss, test_iou = test(args, val_loader, model, criterion, epoch, device, logger)
         training_losses.append(train_loss)
         validation_losses.append(test_loss)
 
-        if epoch % 10 == 0:
-            torch.save(model.state_dict(), os.path.join(args.save_dir, 'model_{}.pth'.format(epoch)))
+        if epoch % args.save_freq == 0:
+            ckpt_dict = {
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'training_losses': training_losses,
+                'validation_losses': validation_losses,
+                'validation_iou': test_iou
+            }
+            torch.save(ckpt_dict, os.path.join(args.save_dir, 'ckpt_epoch_{}.pth'.format(epoch)))
+            logger.info('Epoch: {}, Train Loss: {}, Validation Loss: {}, Validation IoU: {}'.format(
+                epoch, train_loss, test_loss, test_iou))
 
 
 if __name__ == '__main__':
