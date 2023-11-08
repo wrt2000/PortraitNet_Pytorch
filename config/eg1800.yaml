@@ -1,0 +1,25 @@
+# loss args
+lambda: 0.1
+alpha: 2
+gamma: 2
+t: 1
+
+# dataset args
+dataset: EG1800
+data_root: ./dataset
+input_size: 224
+
+
+# training args
+epochs: 2000
+batch_size: 64
+lr: 0.001
+momentum: 0.9
+lr_decay_rate: 0.1
+lr_decay_epoch: 20  # per 20 epoch?
+weight_decay: 0.0005
+num_workers: 8
+device: cuda:0
+
+# save
+save_dir: results/eg1800

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="616d1f85-1f72-4b57-8630-a985288442bc" name="ai15">
+        <fileTransfer rootFolder="/workspace/wangruotong/portraitNet" accessType="SFTP" host="10.26.1.172" port="22" sshConfigId="446f6fc1-2a62-4c33-a032-ccb802f4e8ce" sshConfig="wangruotong@10.26.1.172:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
