@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 
-class ConvBlock(nn.Nodule):
+class ConvBlock(nn.Module):
     """
      Each convolutional layer is followed by a BatchNorm layer and a ReLU layer.
     """

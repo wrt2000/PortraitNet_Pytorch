@@ -44,7 +44,8 @@ class GaussianRandomNoise(object):
 
     def __call__(self, img):
         img = transforms.ToTensor()(img)
-        return img + torch.randn(img.size()) * self.std + self.mean
+        gaussian_img = img + torch.randn(img.size()) * self.std + self.mean
+        return transforms.ToPILImage()(gaussian_img)
 
     def __repr__(self):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
@@ -63,7 +64,9 @@ class RandomSharpness(object):
     def __call__(self, img):
         img = transforms.ToTensor()(img)
         self.sharpness_factor = random.uniform(self.sharpness_range[0], self.sharpness_range[1])  # random choice
-        return TF.adjust_sharpness(img, self.sharpness_factor)
+        sharpness_img = TF.adjust_sharpness(img, self.sharpness_factor)
+        # return PIL image
+        return transforms.ToPILImage()(sharpness_img)
 
     def __repr__(self):
         return self.__class__.__name__ + '(sharpness_factor={0})'.format(self.sharpness_factor)
@@ -87,9 +90,7 @@ def get_texture_transforms():
         # texture augmentation, no need to change mask
         GaussianRandomNoise(),  # random noise
         GaussianBlur(kernel_size=random.choice([3, 5])),  # gaussian blur, kernel size 3 or 5 randomly
-        transforms.RandomColorJitter(hue=(0.4, 1.7)),  # random color change
-        transforms.RandomColorJitter(brightness=(0.4, 1.7)),  # random brightness change
-        transforms.RandomColorJitter(contrast=(0.6, 1.5)),  # random contrast change 0.6-1.0
+        ChangeHSV(hue=(0.4, 1.7), saturation=(0.6, 1.5), value=(0.4, 1.7)),  # change vhsv
         RandomSharpness(sharpness_range=(0.8, 1.3))  # random sharpness change 0.8-1.3
     ]
 
@@ -106,9 +107,9 @@ class RandomHorizontalFlip:
 
     def __call__(self, image, mask):
         if random.random() <= self.p:
-            img = TF.hflip(image)
+            image = TF.hflip(image)
             mask = TF.hflip(mask)
-        return img, mask
+        return image, mask
 
 
 class RandomRotation:
@@ -119,9 +120,9 @@ class RandomRotation:
     def __call__(self, image, mask):
         if random.random() <= self.p:
             angle = random.uniform(self.degrees[0], self.degrees[1])
-            img = TF.rotate(image, angle)
+            image = TF.rotate(image, angle)
             mask = TF.rotate(mask, angle)
-        return img, mask
+        return image, mask
 
 
 class RandomResizedCrop:
@@ -133,9 +134,10 @@ class RandomResizedCrop:
     def __call__(self, image, mask):
         if random.random() <= self.p:
             scale = random.uniform(self.scale[0], self.scale[1])
-            img = TF.resized_crop(image, 0, 0, self.size[0], self.size[1], scale=scale)
-            mask = TF.resized_crop(mask, 0, 0, self.size[0], self.size[1], scale=scale)
-        return img, mask
+            scale = self.size[0] * scale
+            image = TF.resized_crop(image, 0, 0, scale, scale)
+            mask = TF.resized_crop(mask, 0, 0, scale, scale)
+        return image, mask
 
 
 class RandomAffine:
@@ -150,9 +152,9 @@ class RandomAffine:
             translate = (
                 random.uniform(self.translate[0], self.translate[1]),
                 random.uniform(self.translate[0], self.translate[1]))
-            img = TF.affine(image, angle=angle, translate=translate, scale=1, shear=0)
+            image = TF.affine(image, angle=angle, translate=translate, scale=1, shear=0)
             mask = TF.affine(mask, angle=angle, translate=translate, scale=1, shear=0)
-        return img, mask
+        return image, mask
 
 
 def get_deformation_transforms():
@@ -165,3 +167,33 @@ def get_deformation_transforms():
     ]
 
     return transforms.RandomChoice(deformation_aug)
+
+
+class ChangeHSV:
+    """
+    Change HSV of the input image.
+    The range of hue in transforms is [-0.5, 0.5], so we need a new function using cv2.
+    ColorJitter cannot change color directly, so we need to change HSV.
+    """
+
+    def __init__(self, hue, saturation, value):
+        self.hue_scale = random.uniform(hue[0], hue[1])
+        self.saturation_scale = random.uniform(saturation[0], saturation[1])
+        self.value_scale = random.uniform(value[0], value[1])
+
+    def __call__(self, image):
+        h, s, v = cv2.split(cv2.cvtColor(np.array(image), cv2.COLOR_RGB2HSV))
+        # random change one of the three channels
+        channel = random.choice([0, 1, 2])
+        if channel == 0:
+            h = h * self.hue_scale
+            h = np.clip(h, 0, 255).astype(np.uint8)  # make sure data type is consistent
+        elif channel == 1:
+            s = s * self.saturation_scale
+            s = np.clip(s, 0, 255).astype(np.uint8)
+        else:
+            v = v * self.value_scale
+            v = np.clip(v, 0, 255).astype(np.uint8)
+        image = cv2.merge((h, s, v))
+        image = cv2.cvtColor(image, cv2.COLOR_HSV2RGB)
+        return Image.fromarray(image)

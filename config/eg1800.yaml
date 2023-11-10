@@ -6,7 +6,7 @@ t: 1
 
 # dataset args
 dataset: EG1800
-data_root: ./dataset
+data_root: dataset
 input_size: 224
 
 

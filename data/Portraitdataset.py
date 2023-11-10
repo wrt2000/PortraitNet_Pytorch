@@ -9,17 +9,18 @@ import random
 import cv2
 
 
-class RG1800Dataset(Dataset):
+class EG1800Dataset(Dataset):
     """
     EG1800
     """
+
     def __init__(self, args, train=True):
         self.train = train
         self.data_root = args.data_root
         self.dataset = args.dataset
-        self.img_path = os.path.join(self.data_root, 'Images')
+        self.img_path = os.path.join(self.data_root, args.dataset, 'Images')
         self.img_list = sorted(os.listdir(self.img_path))
-        self.mask_path = os.path.join(self.data_root, 'Labels')
+        self.mask_path = os.path.join(self.data_root, args.dataset, 'Labels')
         self.mask_list = sorted(os.listdir(self.mask_path))
         if train:
             self.img_list = self.img_list[:1500]
@@ -28,8 +29,11 @@ class RG1800Dataset(Dataset):
             self.img_list = self.img_list[1500:1800]
             self.mask_list = self.mask_list[1500:1800]
 
+        self.texture_aug = get_texture_transforms()
+        self.deformation_aug = get_deformation_transforms()
+
     def __len__(self):
-        return len(self.img_paths)
+        return len(self.img_list)
 
     @staticmethod
     def get_boundary(mask):
@@ -59,10 +63,10 @@ class RG1800Dataset(Dataset):
         boundary = self.get_boundary(mask)
         img = transforms.ToTensor()(img)
         img_texture = transforms.ToTensor()(img_texture)
-        mask = transforms.ToTensor()(mask)    # (0, 1)?
+        mask = transforms.ToTensor()(mask)  # (0, 1)?
         img = get_dataset_normalization()(img)
         img_texture = get_dataset_normalization()(img_texture)
 
-        return {'Img_name': self.img_paths[idx], 'Img_texture': img_texture, 'Img': img,
+        return {'Img_name': self.img_list[idx], 'Img_texture': img_texture, 'Img': img,
                 'Mask': mask, 'Boundary': boundary}
         # return img, img_texture, mask, boundary

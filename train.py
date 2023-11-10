@@ -8,9 +8,10 @@ import logging
 import argparse
 import torch.nn as nn
 from models.PortraitNet import PortraitNet
-from data.Portraitdataset import RG1800Dataset
+from data.Portraitdataset import EG1800Dataset
 from utils.loss_func import TotalLoss
 from utils.utils import ConfusionMatrix
+import yaml
 
 
 def get_logger():
@@ -26,6 +27,7 @@ def get_logger():
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PortraitNet')
+    parser.add_argument('--config', type=str, default='config/eg1800.yaml')
     # loss
     parser.add_argument('--Lambda', type=float, default=0.1)  # beta?
     parser.add_argument('--alpha', type=float, default=2.0)
@@ -50,6 +52,15 @@ def parse_args():
     parser.add_argument('--save_freq', type=int, default=500)
 
     args = parser.parse_args()
+    return args
+
+
+def get_yaml_config(args, config_path):
+    with open(config_path, 'r') as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+    for key, value in config.items():
+        if key in args:
+            setattr(args, key, value)
     return args
 
 
@@ -105,6 +116,7 @@ def test(args, val_loader, model, criterion, epoch, device, logger):
 
 def main():
     args = parse_args()
+    args = get_yaml_config(args, args.config)
     logger = get_logger()
     logger.info(args)
     # Device(use ddp)
@@ -115,8 +127,8 @@ def main():
 
     # Dataset
     logger.info('Loading dataset...')
-    train_dataset = RG1800Dataset(args, train=True)
-    val_dataset = RG1800Dataset(args, train=False)
+    train_dataset = EG1800Dataset(args, train=True)
+    val_dataset = EG1800Dataset(args, train=False)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
     logger.info('Finish loading dataset! Total training examples: {}, Total validation examples: {}'.format(

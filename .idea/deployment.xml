@@ -9,12 +9,25 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="ai13">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/dataset" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
       <paths name="ai15">
         <serverdata>
           <mappings>
             <mapping deploy="/" local="$PROJECT_DIR$" web="/" />
             <mapping local="" />
           </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/dataset" />
+          </excludedPaths>
         </serverdata>
       </paths>
     </serverData>
