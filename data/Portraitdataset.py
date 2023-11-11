@@ -53,6 +53,8 @@ class EG1800Dataset(Dataset):
         mask_name = self.mask_list[idx].strip()
         img = Image.open(os.path.join(self.img_path, img_name)).convert('RGB')
         mask = Image.open(os.path.join(self.mask_path, mask_name)).convert('L')
+        img = img.resize((224, 224), Image.BILINEAR)
+        mask = mask.resize((224, 224), Image.BILINEAR)
         img_texture = img.copy()
         if self.train:
             aug = random.random()

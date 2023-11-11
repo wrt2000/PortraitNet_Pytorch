@@ -126,7 +126,7 @@ class RandomRotation:
 
 
 class RandomResizedCrop:
-    def __init__(self, size=(224, 224), scale=(0.5, 1.5), p=0.5):
+    def __init__(self, size=[224, 224], scale=(0.5, 1.5), p=0.5):
         self.size = size
         self.scale = scale
         self.p = p
@@ -135,8 +135,8 @@ class RandomResizedCrop:
         if random.random() <= self.p:
             scale = random.uniform(self.scale[0], self.scale[1])
             scale = self.size[0] * scale
-            image = TF.resized_crop(image, 0, 0, scale, scale)
-            mask = TF.resized_crop(mask, 0, 0, scale, scale)
+            image = TF.resized_crop(image, 0, 0, scale, scale, self.size)
+            mask = TF.resized_crop(mask, 0, 0, scale, scale, self.size)
         return image, mask
 
 

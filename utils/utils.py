@@ -6,7 +6,7 @@ def compute_iou(pred_mask, real_mask):
     """
         Calculate iou for two masks.
         :param real_mask: tensor of the real mask
-        :param pred_mask: tensor array of the predicted mask
+        :param pred_mask: tensor of the predicted mask
         :return: IoU score
     """
     real_mask_flat = real_mask.view(-1).bool()
