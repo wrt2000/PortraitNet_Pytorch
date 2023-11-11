@@ -101,15 +101,16 @@ class InvertedResidual(nn.Module):
 class PortraitNet(nn.Module):
     def __init__(self):
         super(PortraitNet, self).__init__()
-        self.first_conv = nn.Conv2d(3, 32, kernel_size=1, stride=2)  
+        self.first_conv = nn.Conv2d(3, 32, kernel_size=1, stride=2)
 
         # Encoder
         # stage 1  (112, 112)
         self.conv1 = InvertedResidual(32, 16, stride=1, expand_ratio=1)
+        self.stage0 = nn.Sequential(self.conv1)
 
         self.conv2 = InvertedResidual(16, 24, stride=2, expand_ratio=6)
         self.conv3 = InvertedResidual(24, 24, stride=1, expand_ratio=6)
-        self.stage1 = nn.Sequential(self.conv1, self.conv2, self.conv3)
+        self.stage1 = nn.Sequential(self.conv2, self.conv3)
 
         # stage 2  (56, 56)
         self.conv4 = InvertedResidual(24, 32, stride=2, expand_ratio=6)
@@ -146,6 +147,8 @@ class PortraitNet(nn.Module):
         self.upsample4 = nn.ConvTranspose2d(16, 16, kernel_size=4, stride=2, padding=1, bias=False)
         self.upsample5 = nn.ConvTranspose2d(8, 8, kernel_size=4, stride=2, padding=1, bias=False)
 
+        # where is max pooling?
+
         # Decoder
         self.dblock1 = DBlock(320, 96)
         self.dblock3 = DBlock(96, 32)
@@ -162,7 +165,8 @@ class PortraitNet(nn.Module):
     def forward(self, x):
         # Encoder
         encoder_out = self.first_conv(x)
-        encoder_out1 = self.stage1(encoder_out)
+        encoder_out_stage0 = self.stage0(encoder_out)
+        encoder_out1 = self.stage1(encoder_out_stage0)
         encoder_out2 = self.stage2(encoder_out1)
         encoder_out3 = self.stage3(encoder_out2)
         encoder_out4 = self.stage4(encoder_out3)
@@ -171,12 +175,17 @@ class PortraitNet(nn.Module):
         # Decoder
         decoder_out1 = self.upsample1(self.dblock1(encoder_out5))  # (14, 14, 96)
         decoder_out2 = self.upsample2(self.dblock3(decoder_out1 + encoder_out4))  # (28, 28, 64)
-        decoder_out3 = self.upsample3(self.dblock4(decoder_out2 + encoder_out3))  # (56, 56, 32)
-        decoder_out4 = self.upsample4(self.dblock5(decoder_out3 + encoder_out2))  # (112, 112, 24)
-        decoder_out5 = self.upsample5(self.dblock6(decoder_out4 + encoder_out1))  # (224, 224, 16)
+        decoder_out3 = self.upsample3(self.dblock4(decoder_out2 + encoder_out2))  # (56, 56, 32)
+        decoder_out4 = self.upsample4(self.dblock5(decoder_out3 + encoder_out1))  # (112, 112, 24)
+        decoder_out5 = self.upsample5(self.dblock6(decoder_out4 + encoder_out_stage0))  # (224, 224, 16)
 
         mask_out = self.mask(decoder_out5)
         boundary_out = self.boundary(decoder_out5)
 
         return mask_out, boundary_out
 
+
+if __name__ == '__main__':
+    model = PortraitNet().to(torch.device('cuda:0'))
+    from torchsummary import summary
+    summary(model, (3, 224, 224))

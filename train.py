@@ -46,7 +46,7 @@ def parse_args():
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--weight_decay', type=float, default=5e-4)
     parser.add_argument('--num_workers', type=int, default=8)
-    parser.add_argument('--device', type=str, default='0,1')
+    parser.add_argument('--device', type=str, default='0')
     # save
     parser.add_argument('--save_dir', type=str, default='results')
     parser.add_argument('--save_freq', type=int, default=500)
@@ -120,7 +120,8 @@ def main():
     logger = get_logger()
     logger.info(args)
     # Device(use ddp)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cpu'
 
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
@@ -154,6 +155,7 @@ def main():
     training_losses = []
     validation_losses = []
     for epoch in range(args.epochs):
+        logger.info('Epoch: {}'.format(epoch))
         train_loss = train(args, train_loader, model, criterion, optimizer, scheduler, epoch, device, logger)
         test_loss, test_iou = test(args, val_loader, model, criterion, epoch, device, logger)
         training_losses.append(train_loss)
@@ -170,8 +172,8 @@ def main():
                 'validation_iou': test_iou
             }
             torch.save(ckpt_dict, os.path.join(args.save_dir, 'ckpt_epoch_{}.pth'.format(epoch)))
-            logger.info('Epoch: {}, Train Loss: {}, Validation Loss: {}, Validation IoU: {}'.format(
-                epoch, train_loss, test_loss, test_iou))
+        logger.info('Epoch: {}, Train Loss: {}, Validation Loss: {}, Validation IoU: {}'.format(
+            epoch, train_loss, test_loss, test_iou))
 
 
 if __name__ == '__main__':

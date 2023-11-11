@@ -68,7 +68,8 @@ class EG1800Dataset(Dataset):
         mask = transforms.ToTensor()(mask)  # (0, 1)?
         img = get_dataset_normalization()(img)
         img_texture = get_dataset_normalization()(img_texture)
+        boundary = torch.from_numpy(boundary / 255.0).unsqueeze(0)
 
-        return {'Img_name': self.img_list[idx], 'Img_texture': img_texture, 'Img': img,
-                'Mask': mask, 'Boundary': boundary}
+        return {'Img_name': self.img_list[idx], 'Img_texture': img_texture.to(torch.float32),
+                'Img': img.to(torch.float32), 'Mask': mask.to(torch.float32), 'Boundary': boundary.to(torch.float32)}
         # return img, img_texture, mask, boundary
