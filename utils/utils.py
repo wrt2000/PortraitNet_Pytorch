@@ -24,7 +24,6 @@ class ConfusionMatrix:
         self.tp = 0
         self.fp = 0
         self.fn = 0
-        self.tn = 0
 
     def update(self, pred_mask, real_mask):
         """
@@ -32,20 +31,23 @@ class ConfusionMatrix:
         :param real_mask: tensor of the real mask
         :param pred_mask: tensor array of the predicted mask
         """
-        real_mask_flat = real_mask.view(-1).bool()
-        pred_mask_flat = pred_mask.view(-1).bool()
+        real_mask = torch.sigmoid(real_mask)
+        pred_mask = torch.sigmoid(pred_mask)
+        threshold = 0.5
 
-        self.tp += (real_mask_flat & pred_mask_flat).float().sum().item()
-        self.fp += (~real_mask_flat & pred_mask_flat).float().sum().item()
-        self.fn += (real_mask_flat & ~pred_mask_flat).float().sum().item()
-        self.tn += (~real_mask_flat & ~pred_mask_flat).float().sum().item()
+        real_mask_flat = real_mask.view(-1) > threshold
+        pred_mask_flat = pred_mask.view(-1) > threshold
+
+        self.tp = self.tp + (real_mask_flat & pred_mask_flat).float().sum().item()
+        self.fp = self.fp + (~real_mask_flat & pred_mask_flat).float().sum().item()
+        self.fn = self.fn + (real_mask_flat & ~pred_mask_flat).float().sum().item()
 
     def get_iou(self):
         """
         Calculate iou for each batch.
         :return: IoU score
         """
-        iou = self.tp / (self.tp + self.fp + self.fn)
+        iou = self.tp / (self.tp + self.fp + self.fn + 1e-10)
         return iou
 
 

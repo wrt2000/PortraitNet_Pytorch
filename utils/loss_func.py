@@ -58,14 +58,18 @@ class KLLoss(nn.Module):
         :param targets: shape (N, C, H, W)
         :return: KL loss
         """
-        inputs = inputs.view(-1, inputs.size(-1))  # (N*H*W, C)
-        targets = targets.view(-1, targets.size(-1)).to(torch.int64)  # (N*H*W, C)
-        inputs = F.log_softmax(inputs / self.t, dim=-1)
-        targets = F.log_softmax(targets / self.t, dim=-1)
+        # inputs = inputs.view(-1, inputs.size(-1))  # (N*H*W, C)
+        # targets = targets.view(-1, targets.size(-1))  # (N*H*W, C)
+        # log_softmax: log of softmax
+        inputs = F.log_softmax(inputs / self.t, dim=1)
+        # make sure inputs is not inf and not contain nan
+        assert torch.isfinite(inputs).all(), f"inputs is not finite. {inputs}"
+        targets = F.softmax(targets / self.t, dim=1)
+        assert torch.isfinite(targets).all(), f"targets is not finite. {targets}"
         # (N*H*W), batchmean: sum up the loss of all examples
-        loss = F.kl_div(inputs, targets, reduction='batchmean')  # input: log
-        # make sure the loss is non negative
-        assert loss >= 0, "KL loss is negative."
+        loss = F.kl_div(inputs, targets, reduction='batchmean') * self.t * self.t  # input: log
+        # make sure the loss is non-negative
+        assert loss >= 0, f"KL loss is negative. {loss}"
         return loss
 
 

@@ -62,7 +62,7 @@ class DBlock(nn.Module):  # bottleneck?
         out = self.conv_dw2(out)
         out = self.conv2(out)
         out = self.bn2(out)
-        out += residual
+        out = residual + out
 
         out = self.relu6(out)
         return out
@@ -92,7 +92,7 @@ class InvertedResidual(nn.Module):
 
         if self.residual:
             residual = x
-            out += residual
+            out = residual + out
 
         out = self.relu6(out)
         return out
@@ -188,4 +188,5 @@ class PortraitNet(nn.Module):
 if __name__ == '__main__':
     model = PortraitNet().to(torch.device('cuda:0'))
     from torchsummary import summary
+
     summary(model, (3, 224, 224))
