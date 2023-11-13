@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
@@ -8,7 +9,7 @@ import logging
 import argparse
 import torch.nn as nn
 from models.PortraitNet import PortraitNet
-from data.Portraitdataset import EG1800Dataset
+from data.Portraitdataset import EG1800Dataset, SuperviseDataset
 from utils.loss_func import TotalLoss
 from utils.utils import ConfusionMatrix
 import yaml
@@ -19,14 +20,29 @@ import torch.utils.data.distributed
 import matplotlib.pyplot as plt
 
 
-def ddp_setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    # os.environ['MASTER_PORT'] = '1255'
-    os.environ['NCCL_DEBUG'] = 'INFO'
+def plot_metrics(training_losses, validation_losses, validation_iou, save_dir):
+    epochs = range(len(training_losses))
 
-    dist.init_process_group(backend='nccl', init_method='env://', world_size=world_size, rank=rank)
-    torch.cuda.set_device(rank)
+    plt.figure(figsize=(12, 5))
 
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, training_losses, label='Training Loss')
+    plt.plot(epochs, validation_losses, label='Validation Loss')
+    plt.title('Training and Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, validation_iou, label='Validation IoU')
+    plt.title('Validation IoU')
+    plt.xlabel('Epochs')
+    plt.ylabel('IoU')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, 'training_metrics.png'))
+    plt.show()
 
 def get_logger():
     logger = logging.getLogger('train')
@@ -41,15 +57,14 @@ def get_logger():
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PortraitNet')
-    parser.add_argument('--config', type=str, default='config/eg1800.yaml')
-    parser.add_argument('--local_rank', type=int)
+    parser.add_argument('--config', type=str, default='config/supervise.yaml')   # config/eg1800.yaml
     # loss
     parser.add_argument('--Lambda', type=float, default=0.1)  # beta?
     parser.add_argument('--alpha', type=float, default=2.0)
     parser.add_argument('--gamma', type=float, default=2.0)
     parser.add_argument('--t', type=float, default=1.0)
     # dataset
-    parser.add_argument('--dataset', type=str, default='EG1800')
+    parser.add_argument('--dataset', type=str, default='Supervisely_face')   # EG1800
     parser.add_argument('--data_root', type=str, default='./dataset')
     parser.add_argument('--input_size', type=int, default=224)
     # train
@@ -129,40 +144,37 @@ def test(args, val_loader, model, criterion, epoch, device, logger):
         return sum(losses) / len(losses), iou
 
 
-def main(rank, world_size):
+def main():
     args = parse_args()
     args = get_yaml_config(args, args.config)
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
+    logger = get_logger()
+    logger.info(args)
+    device = torch.device("cuda:0")
 
-    if rank == 0:
-        logger = get_logger()
-        logger.info(args)
-    else:
-        logger = get_logger()
-
-    ddp_setup(rank, world_size)
-    torch.cuda.set_device(rank)
-    device = torch.device('cuda', rank)
+    # if not os.path.exists(args.save_dir):
+    #     os.makedirs(args.save_dir)
+    current_time = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
+    os.makedirs(f'{args.save_dir}_{current_time}')
+    args.save_dir = f'{args.save_dir}_{current_time}'
 
     # Dataset
     logger.info('Loading dataset...')
-    train_dataset = EG1800Dataset(args, train=True)
-    val_dataset = EG1800Dataset(args, train=False)
-    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, num_replicas=world_size,
-                                                                    rank=rank)
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False,
-                              num_workers=args.num_workers, pin_memory=True, sampler=train_sampler)
-    val_sampler = torch.utils.data.distributed.DistributedSampler(val_dataset, num_replicas=world_size, rank=rank)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
-                            pin_memory=True, sampler=val_sampler)
+    if args.dataset == 'EG1800':
+        train_dataset = EG1800Dataset(args, train=True)
+        val_dataset = EG1800Dataset(args, train=False)
+    elif args.dataset == 'Supervisely_face':
+        train_dataset = SuperviseDataset(args, train=True)
+        val_dataset = SuperviseDataset(args, train=False)
+    else:
+        raise NotImplementedError
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
     logger.info('Finish loading dataset! Total training examples: {}, Total validation examples: {}'.format(
         train_dataset.__len__(), val_dataset.__len__()))
 
     # Model
     logger.info('Building model...')
     model = PortraitNet().to(device)
-    model = DDP(model, device_ids=[rank])
     logger.info(model)
     logger.info('Finish building model!')
 
@@ -180,31 +192,26 @@ def main(rank, world_size):
     training_losses = []
     validation_losses = []
     for epoch in range(args.epochs):
-        train_sampler.set_epoch(epoch)
         logger.info('Epoch: {}'.format(epoch))
         train_loss = train(args, train_loader, model, criterion, optimizer, scheduler, epoch, device, logger)
         test_loss, test_iou = test(args, val_loader, model, criterion, epoch, device, logger)
         training_losses.append(train_loss)
         validation_losses.append(test_loss)
 
-        if rank == 0:
-            if epoch % args.save_freq == 0:
-                ckpt_dict = {
-                    'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'scheduler_state_dict': scheduler.state_dict(),
-                    'training_losses': training_losses,
-                    'validation_losses': validation_losses,
-                    'validation_iou': test_iou
-                }
-                torch.save(ckpt_dict, os.path.join(args.save_dir, 'ckpt_epoch_{}.pth'.format(epoch)))
-            logger.info('Epoch: {}, Train Loss: {}, Validation Loss: {}, Validation IoU: {}'.format(
-                epoch, train_loss, test_loss, test_iou))
-
-    dist.destroy_process_group()
+        if epoch % args.save_freq == 0:
+            ckpt_dict = {
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'training_losses': training_losses,
+                'validation_losses': validation_losses,
+                'validation_iou': test_iou
+            }
+            torch.save(ckpt_dict, os.path.join(args.save_dir, 'ckpt_epoch_{}.pth'.format(epoch)))
+        logger.info('Epoch: {}, Train Loss: {}, Validation Loss: {}, Validation IoU: {}'.format(
+            epoch, train_loss, test_loss, test_iou))
 
 
 if __name__ == '__main__':
-    world_size = torch.cuda.device_count()
-    mp.spawn(main, args=(world_size,), nprocs=world_size, join=True)  # start multi-process training
+    main()
