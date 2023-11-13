@@ -16,6 +16,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.utils.data.distributed
+import matplotlib.pyplot as plt
 
 
 def ddp_setup(rank, world_size):
@@ -205,6 +206,5 @@ def main(rank, world_size):
 
 
 if __name__ == '__main__':
-
     world_size = torch.cuda.device_count()
     mp.spawn(main, args=(world_size,), nprocs=world_size, join=True)  # start multi-process training

@@ -12,6 +12,7 @@ import cv2
 class EG1800Dataset(Dataset):
     """
     EG1800
+    The number of images is smaller than the number of masks!!!
     """
 
     def __init__(self, args, train=True):
@@ -44,15 +45,14 @@ class EG1800Dataset(Dataset):
         """
         mask = np.array(mask)
         mask[mask > 0] = 1
-        boundary = cv2.Canny(mask, threshold1=0, threshold2=1)
+        boundary = cv2.Canny(np.uint8(mask), threshold1=0.3, threshold2=0.5)
 
         return boundary
 
     def __getitem__(self, idx):
         img_name = self.img_list[idx].strip()
-        mask_name = self.mask_list[idx].strip()
         img = Image.open(os.path.join(self.img_path, img_name)).convert('RGB')
-        mask = Image.open(os.path.join(self.mask_path, mask_name)).convert('L')
+        mask = Image.open(os.path.join(self.mask_path, img_name)).convert('L')
         img = img.resize((224, 224), Image.BILINEAR)
         mask = mask.resize((224, 224), Image.BILINEAR)
         img_texture = img.copy()
@@ -65,9 +65,9 @@ class EG1800Dataset(Dataset):
         boundary = self.get_boundary(mask)
         img = transforms.ToTensor()(img)
         img_texture = transforms.ToTensor()(img_texture)
-        mask = transforms.ToTensor()(mask)  # (0, 1)?
-        img = get_dataset_normalization()(img)
-        img_texture = get_dataset_normalization()(img_texture)
+        mask = transforms.ToTensor()(mask) * 255.0  # (0, 1)?
+        # img = get_dataset_normalization()(img)
+        # img_texture = get_dataset_normalization()(img_texture)
         boundary = torch.from_numpy(boundary / 255.0).unsqueeze(0)
 
         return {'Img_name': self.img_list[idx], 'Img_texture': img_texture.to(torch.float32),

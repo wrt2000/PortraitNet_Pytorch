@@ -16,6 +16,13 @@
           </advancedOptions>
         </fileTransfer>
       </webServer>
+      <webServer id="f0f2c87d-9064-4ef6-a028-d19c4e765fd7" name="ai08">
+        <fileTransfer rootFolder="/workspace/wangruotong/PortraitNet" accessType="SFTP" host="10.26.1.139" port="22" sshConfigId="ed9e176e-aab0-4999-a39b-6c61ddda6d87" sshConfig="wangruotong@10.26.1.139:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
     </option>
   </component>
 </project>

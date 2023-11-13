@@ -33,6 +33,8 @@ class ConfusionMatrix:
         :param pred_mask: tensor array of the predicted mask
         """
         threshold = 0.5
+        # change 2 channel to 1
+        pred_mask = torch.argmax(pred_mask, dim=1, keepdim=True)
         pred_mask = torch.sigmoid(pred_mask) > self.threshold
         real_mask = torch.sigmoid(real_mask) > self.threshold
 
@@ -50,5 +52,5 @@ class ConfusionMatrix:
 
 
 # def load_model():
-#  waiting for being added...
+#  waiting ...
 

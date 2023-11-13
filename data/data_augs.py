@@ -24,6 +24,7 @@ class GaussianBlur(object):
     def __call__(self, img):
         img = np.array(img)
         img = cv2.GaussianBlur(img, (self.kernel_size, self.kernel_size), self.sigma)
+        img = img.astype(np.uint8)
         return Image.fromarray(img)
 
     def __repr__(self):
@@ -43,8 +44,11 @@ class GaussianRandomNoise(object):
         self.mean = mean
 
     def __call__(self, img):
-        img = transforms.ToTensor()(img)
+        img = transforms.ToTensor()(img)  # [0, 1]
+        img = img * 255
         gaussian_img = img + torch.randn(img.size()) * self.std + self.mean
+        gaussian_img = torch.clamp(gaussian_img, 0, 255).to(torch.uint8)
+        # return PIL image
         return transforms.ToPILImage()(gaussian_img)
 
     def __repr__(self):
@@ -73,7 +77,9 @@ class RandomSharpness(object):
 
 
 def get_dataset_normalization():
-    return transforms.Normalize([103.94, 116.78, 123.68], [0.017, 0.017, 0.017])
+    mean = np.array([103.94, 116.78, 123.68]) / 255.0
+    std = np.array([0.017, 0.017, 0.017])
+    return transforms.Normalize(mean, std)
 
 
 # transforms, need to make sure img and mask are transformed in the same way
@@ -98,7 +104,9 @@ def get_texture_transforms():
 
 
 def get_dataset_denormalize():
-    return transforms.Normalize([-103.94, -116.78, -123.68], [1 / 0.017, 1 / 0.017, 1 / 0.017])
+    mean = np.array([103.94, 116.78, 123.68]) / 255.0
+    std = np.array([0.017, 0.017, 0.017])
+    return transforms.Normalize(-mean / std, 1 / std)
 
 
 class RandomHorizontalFlip:

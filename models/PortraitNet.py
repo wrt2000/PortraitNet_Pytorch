@@ -98,7 +98,7 @@ class InvertedResidual(nn.Module):
 
 
 class PortraitNet(nn.Module):
-    def __init__(self):
+    def __init__(self, output_class=2):
         super(PortraitNet, self).__init__()
         self.first_conv = nn.Conv2d(3, 32, kernel_size=1, stride=2)
 
@@ -156,10 +156,10 @@ class PortraitNet(nn.Module):
         self.dblock6 = DBlock(16, 8)
 
         # Mask
-        self.mask = nn.Conv2d(8, 1, kernel_size=1, stride=1, padding=0)
+        self.mask = nn.Conv2d(8, output_class, kernel_size=1, stride=1, padding=0)
 
         # Boundary
-        self.boundary = nn.Conv2d(8, 1, kernel_size=1, stride=1, padding=0)
+        self.boundary = nn.Conv2d(8, output_class, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x):
         # Encoder

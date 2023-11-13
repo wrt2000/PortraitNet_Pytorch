@@ -31,13 +31,13 @@ class FocalLoss(nn.Module):
         :param targets: shape (N, H, W)
         :return: focal loss
         """
-        inputs = inputs.view(-1, inputs.size(-1))
-        targets = targets.view(-1, targets.size(-1)).to(torch.int64)
+        inputs = inputs.view(-1, inputs.size(1))
+        targets = targets.view(-1, targets.size(1)).to(torch.int64)
         logpt = F.log_softmax(inputs, dim=-1)
         logpt = logpt.gather(1, targets)  # get the log of the ground truth class
         logpt = logpt.view(-1)
         pt = logpt.exp()
-        loss = -((1 - pt) ** self.gamma) * logpt
+        loss = -(1 - pt) ** self.gamma * logpt
         if self.reduce:
             loss = loss.mean()
 
@@ -58,8 +58,8 @@ class KLLoss(nn.Module):
         :param targets: shape (N, C, H, W)
         :return: KL loss
         """
-        # inputs = inputs.view(-1, inputs.size(-1))  # (N*H*W, C)
-        # targets = targets.view(-1, targets.size(-1))  # (N*H*W, C)
+        inputs = inputs.view(-1, inputs.size(1))  # (N*H*W, C)
+        targets = targets.view(-1, targets.size(1))  # (N*H*W, C)
         # log_softmax: log of softmax
         inputs = F.log_softmax(inputs / self.t, dim=1)
         # make sure inputs is not inf and not contain nan
@@ -92,6 +92,8 @@ class TotalLoss(nn.Module):
         :return: total loss
         """
         # texture loss
+        # delete the channel dim of mask
+        mask = mask.long().squeeze(1)
         loss_mask_texture = self.ce_loss(mask_texture, mask)
         loss_boundary_texture = self.focal_loss(boundary_texture, boundary)
 
@@ -105,8 +107,8 @@ class TotalLoss(nn.Module):
 
         # total loss
         loss_mask = loss_mask_texture + loss_mask_deformation + self.args.alpha * loss_mask_consistency
-        loss_boundary = self.args.Lambda * (loss_boundary_texture + loss_boundary_deformation) + \
-                        self.args.alpha * loss_boundary_consistency
+        loss_boundary = self.args.Lambda * (loss_boundary_texture + loss_boundary_deformation + \
+                        self.args.alpha * loss_boundary_consistency)
         assert loss_mask + loss_boundary >= 0, "Total loss is negative."
 
         return loss_mask + loss_boundary
