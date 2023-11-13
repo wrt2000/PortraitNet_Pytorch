@@ -62,7 +62,7 @@ class DBlock(nn.Module):  # bottleneck?
         out = self.conv_dw2(out)
         out = self.conv2(out)
         out = self.bn2(out)
-        out = residual + out
+        out = torch.add(out, residual)
 
         out = self.relu6(out)
         return out
@@ -91,8 +91,7 @@ class InvertedResidual(nn.Module):
         out = self.bn2(out)
 
         if self.residual:
-            residual = x
-            out = residual + out
+            out = torch.add(out, x)
 
         out = self.relu6(out)
         return out

@@ -9,11 +9,11 @@ def compute_iou(pred_mask, real_mask):
         :param pred_mask: tensor of the predicted mask
         :return: IoU score
     """
-    real_mask_flat = real_mask.view(-1).bool()
-    pred_mask_flat = pred_mask.view(-1).bool()
+    real_mask = real_mask.view(-1).bool()
+    pred_mask = pred_mask.view(-1).bool()
 
-    intersection = (real_mask_flat & pred_mask_flat).float().sum()  # logical AND
-    union = (real_mask_flat | pred_mask_flat).float().sum()
+    intersection = (real_mask & pred_mask).float().sum()  # logical AND
+    union = (real_mask | pred_mask).float().sum()
 
     iou = intersection / union if union != 0 else torch.tensor(1.0)
     return iou
@@ -24,6 +24,7 @@ class ConfusionMatrix:
         self.tp = 0
         self.fp = 0
         self.fn = 0
+        self.threshold = 0.5
 
     def update(self, pred_mask, real_mask):
         """
@@ -31,16 +32,13 @@ class ConfusionMatrix:
         :param real_mask: tensor of the real mask
         :param pred_mask: tensor array of the predicted mask
         """
-        real_mask = torch.sigmoid(real_mask)
-        pred_mask = torch.sigmoid(pred_mask)
         threshold = 0.5
+        pred_mask = torch.sigmoid(pred_mask) > self.threshold
+        real_mask = torch.sigmoid(real_mask) > self.threshold
 
-        real_mask_flat = real_mask.view(-1) > threshold
-        pred_mask_flat = pred_mask.view(-1) > threshold
-
-        self.tp = self.tp + (real_mask_flat & pred_mask_flat).float().sum().item()
-        self.fp = self.fp + (~real_mask_flat & pred_mask_flat).float().sum().item()
-        self.fn = self.fn + (real_mask_flat & ~pred_mask_flat).float().sum().item()
+        self.tp = self.tp + (real_mask & pred_mask).float().sum().item()
+        self.fp = self.fp + (~real_mask & pred_mask).float().sum().item()
+        self.fn = self.fn + (real_mask & ~pred_mask).float().sum().item()
 
     def get_iou(self):
         """
