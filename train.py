@@ -208,7 +208,7 @@ def main():
         training_losses.append(train_loss)
         validation_losses.append(test_loss)
 
-        if epoch % args.save_freq == 0:
+        if (epoch + 1) % args.save_freq == 0:
             ckpt_dict = {
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
